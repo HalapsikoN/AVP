@@ -54,8 +54,10 @@ float** multiplyInnerMatrix_optimized_only_line_loops(float** matrix1, float** m
 
 	for (int i = 0; i < m; ++i) {
 		for (int j = 0; j < k; ++j) {
+			float firstMatrixNum = matrix1[i][j];
+//#pragma loop(hint_parallel(4))
 			for (int g = 0; g < n; ++g) {
-				result[i][g] += matrix1[i][j] * matrix2[j][g];
+				result[i][g] += firstMatrixNum * matrix2[j][g];
 			}
 		}
 	}
@@ -75,29 +77,48 @@ float** assemblerMultiMatrix4X4(float** matrix1, float** matrix2, int m, int n, 
 		}
 	}*/
 
-	_asm {
-		pusha
-		xor esi, esi		//refister for matrix1
-		xor edi, edi		//register for matrix2
-		xor ebp, ebp		//register for resultMatrix
+	//_asm {
+	//	pusha
+	//	xor esi, esi		//refister for matrix1
+	//	xor edi, edi		//register for matrix2
+	//	xor ebp, ebp		//register for resultMatrix
 
-		pxor MM7, MM7
+	//	pxor MM7, MM7
 
-		movq MM0, matrix1[esi]
-		add esi, 8
-		movq MM1, matrix1[esi]
-		add esi, 8
-		
-		movd MM3, matrix2[edi]
-		pssl MM3, 4						//shift left
-		movd MM3, matrix2[edi+64]
-		movd MM4, matrix2[edi+128]
-		pssl MM4, 4
-		movd MM4, matrix2[edi + 192]
+	//	movq MM0, matrix1[esi]
+	//	add esi, 8
+	//	movq MM1, matrix1[esi]
+	//	add esi, 8
 
-		//mmx ne prokatit net norm funczii dlya peremnojenia
+	//	movd MM3, matrix2[edi]
+	//	pssl MM3, 4						//shift left
+	//	movd MM3, matrix2[edi + 64]
+	//	movd MM4, matrix2[edi + 128]
+	//	pssl MM4, 4
+	//	movd MM4, matrix2[edi + 192]
+
+	//	//mmx ne prokatit net norm funczii dlya peremnojenia
 
 
+	//};
+
+	return result;
+}
+
+float** intrncsMatrix(float** matrix1, float** matrix2, int m, int n, int k) {
+	__m128 a_line, b_line, r_line;
+
+	float** result = createInnerMatrix(m, n);
+
+	for (int i = 0; i < m; ++i) {
+			r_line = _mm_setzero_ps();
+			for (int j = 0; j < k; j++)
+			{
+				b_line = _mm_load_ps(matrix2[j]);
+				a_line = _mm_set1_ps(matrix1[i][j]);
+				r_line = _mm_add_ps(_mm_mul_ps(a_line, b_line), r_line);
+			}
+			_mm_store_ps(result[i], r_line);
 	}
 
 	return result;
@@ -166,10 +187,27 @@ int main() {
 	delay = (finish.QuadPart - start.QuadPart) * 1000.0f / frequency.QuadPart;
 	cout << "Time vectorize cicle in ms: " << delay << endl;
 
+	float** resultMatrix3;
+	QueryPerformanceCounter(&start);
+	for (int i = 0; i < MAIN_LINES_AMOUNT_1; ++i) {
+		for (int j = 0; j < MAIN_COLUMNS_AMOUNT_1; ++j) {
+			for (int k = 0; k < MAIN_LINES_AMOUNT_2; ++k) {
+				for (int l = 0; l < MAIN_COLUMNS_AMOUNT_2; ++l) {
+					resultMatrix3 = intrncsMatrix(matrix3[i][j], matrix4[k][l], INNER_LINES_AMOUNT_1, INNER_COLUMNS_AMOUNT_2, INNER_COMMON_SIDE_AMOUNT);
+				}
+			}
+		}
+	}
+	QueryPerformanceCounter(&finish);
+	delay = (finish.QuadPart - start.QuadPart) * 1000.0f / frequency.QuadPart;
+	cout << "Time with using intrinsics in ms: " << delay << endl;
+
 	cout << endl;
 	showInnerMatrix(resultMatrix1, INNER_LINES_AMOUNT_1, INNER_COLUMNS_AMOUNT_2);
 	cout << endl;
 	showInnerMatrix(resultMatrix2, INNER_LINES_AMOUNT_1, INNER_COLUMNS_AMOUNT_2);
+	cout << endl;
+	showInnerMatrix(resultMatrix3, INNER_LINES_AMOUNT_1, INNER_COLUMNS_AMOUNT_2);
 	cout << endl;
 
 	float** matrix1 = createInnerMatrix(INNER_LINES_AMOUNT_1, INNER_COLUMNS_AMOUNT_1);
@@ -184,14 +222,33 @@ int main() {
 	cout << "Time \"v lob\" in ms: " << delay << endl;
 	showInnerMatrix(matrix5, INNER_LINES_AMOUNT_1, INNER_COLUMNS_AMOUNT_2);
 
+
+	float** matrix8 = createInnerMatrix(1000, 1000);
+	float** matrix9 = createInnerMatrix(1000, 1000);
+	initializeMatrixWithRandomValues(matrix8, 1000, 1000);
+	initializeMatrixWithRandomValues(matrix9, 1000, 1000);
 	QueryPerformanceCounter(&start);
-	float** matrix6 = multiplyInnerMatrix_optimized_only_line_loops(matrix1, matrix2, INNER_LINES_AMOUNT_1, INNER_COLUMNS_AMOUNT_2, INNER_COMMON_SIDE_AMOUNT);
+	float** matrix6 = multiplyInnerMatrix_optimized_only_line_loops(matrix8, matrix9, 1000, 1000, 1000);
 	QueryPerformanceCounter(&finish);
 	delay = (finish.QuadPart - start.QuadPart) * 1000.0f / frequency.QuadPart;
 	cout << "Time with line loops optimization in ms: " << delay << endl;
-	showInnerMatrix(matrix6, INNER_LINES_AMOUNT_1, INNER_COLUMNS_AMOUNT_2);
+	//showInnerMatrix(matrix6, INNER_LINES_AMOUNT_1, INNER_COLUMNS_AMOUNT_2);
+	QueryPerformanceCounter(&start);
+	float** matrix10 = multiplyInnerMatrix_VLob(matrix8, matrix9, 1000, 1000, 1000);
+	QueryPerformanceCounter(&finish);
+	delay = (finish.QuadPart - start.QuadPart) * 1000.0f / frequency.QuadPart;
+	cout << "Time \"v lob\" in ms: " << delay << endl;
+	//showInnerMatrix(matrix5, INNER_LINES_AMOUNT_1, INNER_COLUMNS_AMOUNT_2);
 
-	float C[10000] = { 123.456 }, B[10000] = {678.678}, A[10000];
+
+	QueryPerformanceCounter(&start);
+	float** matrix7 = intrncsMatrix(matrix1, matrix2, INNER_LINES_AMOUNT_1, INNER_COLUMNS_AMOUNT_2, INNER_COMMON_SIDE_AMOUNT);
+	QueryPerformanceCounter(&finish);
+	delay = (finish.QuadPart - start.QuadPart) * 1000.0f / frequency.QuadPart;
+	cout << "Time with using intrinsics in ms: " << delay << endl;
+	showInnerMatrix(matrix7, INNER_LINES_AMOUNT_1, INNER_COLUMNS_AMOUNT_2);
+
+	/*float C[10000] = { 123.456 }, B[10000] = {678.678}, A[10000];
 
 	QueryPerformanceCounter(&start);
 	for (int i = 0; i < 10000; ++i)
@@ -206,6 +263,6 @@ int main() {
 		A[i] = 5 + C[i];
 	QueryPerformanceCounter(&finish);
 	delay = (finish.QuadPart - start.QuadPart) * 1000.0f / frequency.QuadPart;
-	cout << "Time with line loops optimization in ms: " << delay << endl;
+	cout << "Time with line loops optimization in ms: " << delay << endl;*/
 	return 0;
 }
