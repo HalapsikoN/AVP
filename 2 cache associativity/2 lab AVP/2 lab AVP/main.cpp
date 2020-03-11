@@ -1,25 +1,41 @@
 #include <iostream>
 #include <Windows.h>
 #include <ctime>
-
 #include <stdio.h>
 #include <intrin.h>
 
-//#pragma intrinsic(__rdtsc)
+//Intel Core I-7 7700HQ
+//L1 - size:32 kB, 8-way, 64-byte line size
+//L2 - size:256 kB, 4-way, 64-byte line size
+//L3 - size:6 MB, 12-way, 64-byte line size
 
-
-#define CASHL1 32768
-#define CASHL2
-#define CASHL3
 #define ELEMENT_SIZE 8
-//#define LINE_SIZE 64
-#define ELEMENTS_AMOUNT_IN_WAY 64
-//#define NUMBER_OF_WAYES 8
-//#define NUMBER_OF_SETS 64
-#define OFFSET 512
 #define NMAX 20
-#define SIZE_ARRAY CASHL1/sizeof(long long) *NMAX
 
+//<----------------------------------L1------------------------------>
+//#define CASH 32768
+//#define NUMBER_OF_WAYES 8
+//#define CASH_LINE_SIZE 64
+//
+//#define ELEMENTS_AMOUNT_IN_WAY CASH/CASH_LINE_SIZE/NUMBER_OF_WAYES
+//#define OFFSET CASH/CASH_LINE_SIZE
+//#define SIZE_ARRAY CASH/sizeof(long long) *NMAX
+//<----------------------------------L2------------------------------>
+#define CASH 262144
+#define NUMBER_OF_WAYES 4
+#define CASH_LINE_SIZE 64
+
+#define ELEMENTS_AMOUNT_IN_WAY CASH/CASH_LINE_SIZE/NUMBER_OF_WAYES
+#define OFFSET CASH/CASH_LINE_SIZE
+#define SIZE_ARRAY CASH/sizeof(long long) *NMAX
+//<----------------------------------L3------------------------------>
+//#define CASH 6291456
+//#define NUMBER_OF_WAYES 12
+//#define CASH_LINE_SIZE 64
+//
+//#define ELEMENTS_AMOUNT_IN_WAY CASH/CASH_LINE_SIZE/NUMBER_OF_WAYES
+//#define OFFSET CASH/CASH_LINE_SIZE
+//#define SIZE_ARRAY CASH/sizeof(long long) *NMAX
 
 using namespace std;
 
@@ -30,12 +46,8 @@ int main() {
 	srand(static_cast <unsigned> (time(0)));
 	unsigned __int64 st, end;
 
-	long long memory[SIZE_ARRAY];
+	long long* memory=(long long*)calloc(SIZE_ARRAY, sizeof(long long));
 	long long temp=0;
-
-	for (int i = 0; i < SIZE_ARRAY; ++i) {
-		memory[i] = 0;
-	}
 	
 	for (int n = 1; n <= NMAX; ++n) {
 		
@@ -54,24 +66,18 @@ int main() {
 		temp = 0;
 
 		QueryPerformanceCounter(&start);
-		//st = __rdtsc();
-		for (int i = 0; i < (SIZE_ARRAY)*100; ++i) {
+		
+		for (int i = 0; i < (SIZE_ARRAY)*10; ++i) {
 			temp = memory[temp];
 			counter++;
 		}
-		//cout << counter << endl;
-		//end = __rdtsc();
+		
 		QueryPerformanceCounter(&finish);
 		delay = (finish.QuadPart - start.QuadPart) * 1000.0f / frequency.QuadPart;
 		cout << "for n ("<<n<<") in ms: " <<delay << endl;
-		//cout << "for n (" << n << ") in ms: " << end-st << endl;
-		//cout << counter << endl;
-
+		
 	}
-	
-	
-	
-	
+	memory[temp] = 0;
 	
 	system("pause");
 	return 0;
