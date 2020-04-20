@@ -15,7 +15,6 @@
 
 #define SIZE_M 64
 #define SIZE_N 1024
-//почему у гридов какой-то реверс x и y?
 #define GRID_X 2
 #define GRID_Y 8
 #define BLOCK_X 32
@@ -141,12 +140,6 @@ __global__ void matrixRebuildShared(int* src, int* dst, int rowLength)
 	dst[(offsetY + 32)*rowLength + offsetX] = smemOut[(threadIdx.y)*row + threadIdx.x+32];
 	dst[(offsetY + 64)*rowLength + offsetX] = smemOut[(threadIdx.y)*row + threadIdx.x+64];
 	dst[(offsetY + 96)*rowLength + offsetX] = smemOut[(threadIdx.y)*row + threadIdx.x+96];
-
-	/*
-	dst[(offsetY + 0)*rowLength + offsetX] = smemIn[(threadIdx.y+0)*row+threadIdx.x];
-	dst[(offsetY + 1)*rowLength + offsetX] = smemIn[(threadIdx.y + 1)*row + threadIdx.x];
-	dst[(offsetY + 2)*rowLength + offsetX] = smemIn[(threadIdx.y + 0)*row + threadIdx.x+1];
-	dst[(offsetY + 3)*rowLength + offsetX] = smemIn[(threadIdx.y + 1)*row + threadIdx.x+1];*/
 }
 
 void cpuWork(int* initMatrix, int* outMatrix)
@@ -282,7 +275,7 @@ bool compareOutMatrix(int* first, int* second)
 	{
 		if (first[i] != second[i])
 		{
-			printf("position = %d, GPU =  %d, CPU = %d ", i, first[i], second[i]);
+			printf("\nposition = %d, GPU =  %d, CPU = %d ", i, first[i], second[i]);
 			return false;
 		}
 	}
@@ -292,31 +285,6 @@ bool compareOutMatrix(int* first, int* second)
 
 int main()
 {
-	/*int *a, *b, *c;
-
-	cudaMallocManaged(&a,SIZE * sizeof(int));
-	cudaMallocManaged(&b,SIZE * sizeof(int));
-	cudaMallocManaged(&c, SIZE * sizeof(int));
-
-	for (int i = 0; i < SIZE; ++i)
-	{
-		a[i] = i;
-		b[i] = i;
-		c[i] = i;
-	}
-
-	vectorAdd <<<1,SIZE>>> (a, b, c, SIZE);
-
-	cudaDeviceSynchronize();
-
-	for (int i = 0; i < 10; ++i)
-	{
-		printf("c[%d] = %d\n", i, c[i]);
-	}
-
-	cudaFree(a);
-	cudaFree(b);
-	cudaFree(c);*/
 
 	int* initMatrix = (int*)calloc(SIZE_M*SIZE_N,sizeof(int));
 	int* cpu_outMatrix = (int*)calloc(SIZE_N*SIZE_M,sizeof(int));
@@ -325,17 +293,10 @@ int main()
 
 	fillMatrix(initMatrix, SIZE_M, SIZE_N);
 
-	//printfFirstNForInit(initMatrix, 10);
-	//printfFirstNForOut(cuda_outMatrix, 10);
-
 	cpuWork(initMatrix, cpu_outMatrix);
-
-	//printfFirstNForInit(initMatrix, 10);
-	//printfFirstNForOut(cpu_outMatrix, 10);
 
 	cudaWork(initMatrix, cuda_outMatrix);
 
-	//printfFirstNForInit(initMatrix, 10);
 	printfFirstNForOut(cuda_outMatrix, 10);
 
 	cudaShredWork(initMatrix, cuda_outMatrixSharedMemory);
@@ -343,8 +304,8 @@ int main()
 	printfFirstNForInit(initMatrix, 10);
 	printfFirstNForOut(cuda_outMatrixSharedMemory, 10);
 
-	printf("\n\n RESULT OF COMPARE CUDA AND CPU: %s\n", (compareOutMatrix(cuda_outMatrix, cpu_outMatrix) ? "+" : "-"));
-	printf("\n\n RESULT OF COMPARE CUDA SHARED AND CPU: %s\n", (compareOutMatrix(cuda_outMatrixSharedMemory, cpu_outMatrix) ? "+" : "-"));
+	printf("\n\n RESULT OF COMPARE CUDA AND CPU: %s\n\n", (compareOutMatrix(cuda_outMatrix, cpu_outMatrix) ? "+" : "-"));
+	printf("\nRESULT OF COMPARE CUDA SHARED AND CPU: %s\n", (compareOutMatrix(cuda_outMatrixSharedMemory, cpu_outMatrix) ? "+" : "-"));
 
 	free(initMatrix);
 	free(cpu_outMatrix);
