@@ -24,16 +24,6 @@
 
 using namespace std;
 
-//__global__ void vectorAdd(int *a, int *b, int *c, int n)
-//{
-//	int i = threadIdx.x;
-//
-//	if(i<n)
-//	{
-//		c[i] = a[i] + b[i];
-//	}
-//}
-
 void fillMatrix(int* matrix, int sizeM, int sizeN)
 {
 	int counter = 0;
