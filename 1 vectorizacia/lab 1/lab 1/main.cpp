@@ -8,11 +8,11 @@
 #define INNER_LINES_AMOUNT_2 INNER_COMMON_SIDE_AMOUNT
 #define INNER_COLUMNS_AMOUNT_2 4
 
-#define MAIN_LINES_AMOUNT_1 200
-#define MAIN_COMMON_SIDE_AMOUNT 200
+#define MAIN_LINES_AMOUNT_1 40
+#define MAIN_COMMON_SIDE_AMOUNT 40
 #define MAIN_COLUMNS_AMOUNT_1 MAIN_COMMON_SIDE_AMOUNT
 #define MAIN_LINES_AMOUNT_2 MAIN_COMMON_SIDE_AMOUNT
-#define MAIN_COLUMNS_AMOUNT_2 200
+#define MAIN_COLUMNS_AMOUNT_2 40
 
 
 using namespace std;
@@ -175,21 +175,21 @@ int main() {
 	for (int i = 0; i < MAIN_LINES_AMOUNT_1; ++i) {
 		matrix12[i] = (float***)calloc(MAIN_COLUMNS_AMOUNT_1, sizeof(float**));
 	}
-	float** resultMatrix3;
-	QueryPerformanceCounter(&start);
-	for (int i = 0; i < MAIN_LINES_AMOUNT_1; ++i) {
-		for (int j = 0; j < MAIN_COLUMNS_AMOUNT_1; ++j) {
-			float** generalConst = matrix3[i][j];
-			for (int l = 0; l < MAIN_COLUMNS_AMOUNT_2; ++l) {
-				//matrix12[i][l] = intrncsMatrix(generalConst, matrix4[j][l], INNER_LINES_AMOUNT_1, INNER_COLUMNS_AMOUNT_2, INNER_COMMON_SIDE_AMOUNT);
-			}
-		}
-	}
-	QueryPerformanceCounter(&finish);
-	delay = (finish.QuadPart - start.QuadPart) * 1000.0f / frequency.QuadPart;
-	cout << "Time with using intrinsics in ms: " << delay << endl;
+	//float** resultMatrix3;
+	//QueryPerformanceCounter(&start);
+	//for (int i = 0; i < MAIN_LINES_AMOUNT_1; ++i) {
+	//	for (int j = 0; j < MAIN_COLUMNS_AMOUNT_1; ++j) {
+	//		float** generalConst = matrix3[i][j];
+	//		for (int l = 0; l < MAIN_COLUMNS_AMOUNT_2; ++l) {
+	//			//matrix12[i][l] = intrncsMatrix(generalConst, matrix4[j][l], INNER_LINES_AMOUNT_1, INNER_COLUMNS_AMOUNT_2, INNER_COMMON_SIDE_AMOUNT);
+	//		}
+	//	}
+	//}
+	//QueryPerformanceCounter(&finish);
+	//delay = (finish.QuadPart - start.QuadPart) * 1000.0f / frequency.QuadPart;
+	//cout << "Time with using intrinsics in ms: " << delay << endl;
 
-	bool isEqualBig = true;
+	/*bool isEqualBig = true;
 	for (int i = 0; i < MAIN_LINES_AMOUNT_1; ++i) {
 		for (int l = 0; l < MAIN_COLUMNS_AMOUNT_2; ++l) {
 			if (!comareToInnerMatrix(matrix11[i][l], matrix13[i][l], INNER_LINES_AMOUNT_1, INNER_COLUMNS_AMOUNT_2)) {
@@ -197,7 +197,7 @@ int main() {
 			}
 		}
 	}
-	cout << (isEqualBig ? "matrices are equal" : "matrices aren't equal") << endl;
+	cout << (isEqualBig ? "matrices are equal" : "matrices aren't equal") << endl;*/
 
 	float** matrix1 = createInnerMatrix(INNER_LINES_AMOUNT_1, INNER_COLUMNS_AMOUNT_1);
 	float** matrix2 = createInnerMatrix(INNER_LINES_AMOUNT_2, INNER_COLUMNS_AMOUNT_2);
@@ -212,25 +212,25 @@ int main() {
 	//showInnerMatrix(matrix5, INNER_LINES_AMOUNT_1, INNER_COLUMNS_AMOUNT_2);
 
 
-	float** matrix8 = createInnerMatrix(1000, 1000);
-	float** matrix9 = createInnerMatrix(1000, 1000);
-	initializeMatrixWithRandomValues(matrix8, 1000, 1000);
-	initializeMatrixWithRandomValues(matrix9, 1000, 1000);
+	float** matrix8 = createInnerMatrix(500, 500);
+	float** matrix9 = createInnerMatrix(500, 500);
+	initializeMatrixWithRandomValues(matrix8, 500, 500);
+	initializeMatrixWithRandomValues(matrix9, 500, 500);
 	QueryPerformanceCounter(&start);
-	float** matrix6 = multiplyInnerMatrix_optimized_only_line_loops(matrix8, matrix9, 1000, 1000, 1000);
+	float** matrix6 = multiplyInnerMatrix_optimized_only_line_loops(matrix8, matrix9, 500, 500, 500);
 	QueryPerformanceCounter(&finish);
 	delay = (finish.QuadPart - start.QuadPart) * 1000.0f / frequency.QuadPart;
 	cout << "Time with line loops optimization in ms: " << delay << endl;
 	//showInnerMatrix(matrix6, INNER_LINES_AMOUNT_1, INNER_COLUMNS_AMOUNT_2);
 	QueryPerformanceCounter(&start);
-	float** matrix10 = multiplyInnerMatrix_VLob(matrix8, matrix9, 1000, 1000, 1000);
+	float** matrix10 = multiplyInnerMatrix_VLob(matrix8, matrix9, 500, 500, 500);
 	QueryPerformanceCounter(&finish);
 	delay = (finish.QuadPart - start.QuadPart) * 1000.0f / frequency.QuadPart;
 	cout << "Time \"v lob\" in ms: " << delay << endl;
 	//showInnerMatrix(matrix10, INNER_LINES_AMOUNT_1, INNER_COLUMNS_AMOUNT_2);
-	bool isEquals = comareToInnerMatrix(matrix6, matrix10, 1000, 1000);
+	/*bool isEquals = comareToInnerMatrix(matrix6, matrix10, 1000, 1000);
 	cout << (isEquals ? "matrices are equal" : "matrices aren't equal") << endl;
-	
+	*/
 
 	/*QueryPerformanceCounter(&start);
 	float** matrix7 = intrncsMatrix(matrix1, matrix2, INNER_LINES_AMOUNT_1, INNER_COLUMNS_AMOUNT_2, INNER_COMMON_SIDE_AMOUNT);
@@ -255,6 +255,6 @@ int main() {
 	QueryPerformanceCounter(&finish);
 	delay = (finish.QuadPart - start.QuadPart) * 1000.0f / frequency.QuadPart;
 	cout << "Time with line loops optimization in ms: " << delay << endl;*/
-	system("pause");
+	//system("pause");
 	return 0;
 }

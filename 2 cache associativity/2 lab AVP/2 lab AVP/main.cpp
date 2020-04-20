@@ -11,6 +11,7 @@
 
 #define ELEMENT_SIZE 8
 #define NMAX 20
+#define N SIZE_ARRAY*10
 
 //<----------------------------------L1------------------------------>
 //#define CASH 32768
@@ -28,6 +29,7 @@
 #define ELEMENTS_AMOUNT_IN_WAY CASH/CASH_LINE_SIZE/NUMBER_OF_WAYES
 #define OFFSET CASH/CASH_LINE_SIZE
 #define SIZE_ARRAY CASH/sizeof(long long) *NMAX
+
 //<----------------------------------L3------------------------------>
 //#define CASH 6291456
 //#define NUMBER_OF_WAYES 12
@@ -48,7 +50,7 @@ int main() {
 
 	long long* memory=(long long*)calloc(SIZE_ARRAY, sizeof(long long));
 	long long temp=0;
-	
+
 	for (int n = 1; n <= NMAX; ++n) {
 		
 		int counter = 0;
@@ -67,9 +69,10 @@ int main() {
 
 		QueryPerformanceCounter(&start);
 		
-		for (int i = 0; i < (SIZE_ARRAY)*10; ++i) {
+
+		for (int i = 0; i < N; ++i) {
 			temp = memory[temp];
-			counter++;
+			//counter++;
 		}
 		
 		QueryPerformanceCounter(&finish);
@@ -79,6 +82,6 @@ int main() {
 	}
 	memory[temp] = 0;
 	
-	system("pause");
+	//system("pause");
 	return 0;
 }
