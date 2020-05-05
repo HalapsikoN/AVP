@@ -36,7 +36,7 @@ void fillMatrix(int* matrix, int sizeM, int sizeN)
 	}
 }
 
-void printfFirstNForInit(int* matrix, int N)
+void printfFirstNForInit(int* matrix)
 {
 	for (int i = 0; i < 16; ++i)
 	{
@@ -46,10 +46,10 @@ void printfFirstNForInit(int* matrix, int N)
 		}
 		printf("\n");
 	}
-	printf("<------------------------%d------------------------------->\n", N);
+	printf("<--------------------------------------------------------->\n");
 }
 
-void printfFirstNForOut(int* matrix, int N)
+void printfFirstNForOut(int* matrix)
 {
 	for (int i = 0; i < 16/4; ++i)
 	{
@@ -59,7 +59,7 @@ void printfFirstNForOut(int* matrix, int N)
 		}
 		printf("\n");
 	}
-	printf("<------------------------%d------------------------------->\n", N);
+	printf("<--------------------------------------------------------->\n");
 }
 
 void cudaCheckStatus(cudaError_t cudaStatus)
@@ -89,8 +89,8 @@ __global__ void matrixRebuild(int* src, int* dst, int rowLength)
 	dst[startWriteIndex+3] = d;*/
 
 
-	const int offsetX_out = BLOCK_X*blockIdx.x*THREAD_ELEMENT_Y + threadIdx.x*THREAD_ELEMENT_Y;
-	const int offsetY_out = BLOCK_Y*blockIdx.y*THREAD_ELEMENT_X + threadIdx.y*THREAD_ELEMENT_X;
+	const int offsetX_out = BLOCK_Y*blockIdx.x*THREAD_ELEMENT_Y + threadIdx.x*THREAD_ELEMENT_Y;
+	const int offsetY_out = BLOCK_X*blockIdx.y*THREAD_ELEMENT_X + threadIdx.y*THREAD_ELEMENT_X;
 
 	dst[offsetY_out*rowLength * 4 + offsetX_out + 0] = a;
 	dst[offsetY_out*rowLength * 4 + offsetX_out + 1] = b;
@@ -110,9 +110,9 @@ __global__ void matrixRebuildShared(int* src, int* dst, int rowLength)
 	int row = 32;
 
 	smemIn[(threadIdx.y + 0)*row + threadIdx.x] = src[(offsetY + 0)*rowLength + offsetX];
-	smemIn[(threadIdx.y + 32)*row + threadIdx.x] = src[(offsetY + 32)*rowLength + offsetX];
-	smemIn[(threadIdx.y + 64)*row + threadIdx.x] = src[(offsetY + 64)*rowLength + offsetX];
-	smemIn[(threadIdx.y + 96)*row + threadIdx.x] = src[(offsetY + 96)*rowLength + offsetX];
+	smemIn[(threadIdx.y + 1)*row + threadIdx.x] = src[(offsetY + 1)*rowLength + offsetX];
+	smemIn[(threadIdx.y + 2)*row + threadIdx.x] = src[(offsetY + 2)*rowLength + offsetX];
+	smemIn[(threadIdx.y + 3)*row + threadIdx.x] = src[(offsetY + 3)*rowLength + offsetX];
 
 	__syncthreads();
 
@@ -287,12 +287,12 @@ int main()
 
 	cudaWork(initMatrix, cuda_outMatrix);
 
-	printfFirstNForOut(cuda_outMatrix, 10);
+	printfFirstNForOut(cuda_outMatrix);
 
 	cudaShredWork(initMatrix, cuda_outMatrixSharedMemory);
 
-	printfFirstNForInit(initMatrix, 10);
-	printfFirstNForOut(cuda_outMatrixSharedMemory, 10);
+	printfFirstNForInit(initMatrix);
+	printfFirstNForOut(cuda_outMatrixSharedMemory);
 
 	printf("\n\n RESULT OF COMPARE CUDA AND CPU: %s\n\n", (compareOutMatrix(cuda_outMatrix, cpu_outMatrix) ? "+" : "-"));
 	printf("\nRESULT OF COMPARE CUDA SHARED AND CPU: %s\n", (compareOutMatrix(cuda_outMatrixSharedMemory, cpu_outMatrix) ? "+" : "-"));
