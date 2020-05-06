@@ -16,8 +16,8 @@
 
 using namespace std;
 
-#define THREAD_X 32
-#define THREAD_Y 32
+#define BLOCK_X 32
+#define BLOCK_Y 32
 
 void cudaCheckStatus(cudaError_t cudaStatus)
 {
@@ -134,13 +134,13 @@ void cuda_work(unsigned char* imgIn, unsigned char* imgOut, int width, int heigh
 	cudaCheckStatus(cudaEventCreate(&stop));
 
 	int widthGpu = width, heightGpu = height;
-	if (widthGpu%THREAD_X != 0)
+	if (widthGpu%BLOCK_X != 0)
 	{
-		widthGpu = (width / THREAD_X + 1)*THREAD_X;
+		widthGpu = (width / BLOCK_X + 1)*BLOCK_X;
 	}
-	if (heightGpu%THREAD_Y != 0)
+	if (heightGpu%BLOCK_Y != 0)
 	{
-		heightGpu = (height / THREAD_Y + 1)*THREAD_Y;
+		heightGpu = (height / BLOCK_Y + 1)*BLOCK_Y;
 	}
 
 	//int pitch= (width / THREAD_X + 1)*THREAD_X;
@@ -152,8 +152,8 @@ void cuda_work(unsigned char* imgIn, unsigned char* imgOut, int width, int heigh
 		cudaCheckStatus(cudaMemcpy(&deviceInMatrix[i*widthGpu], &imgIn[i*width], width * sizeof(unsigned char), cudaMemcpyHostToDevice));
 	}
 
-	dim3 dimGrid(widthGpu/ THREAD_X, heightGpu/ THREAD_Y);
-	dim3 dimBlock(THREAD_X, THREAD_Y);
+	dim3 dimGrid(widthGpu/ BLOCK_X, heightGpu/ BLOCK_Y);
+	dim3 dimBlock(BLOCK_X, BLOCK_Y);
 	printf("gridX = %d gridY = %d\n", dimGrid.x, dimGrid.y);
 	printf("blockX = %d blockY = %d\n", dimBlock.x, dimBlock.y);
 
@@ -181,7 +181,146 @@ void cuda_work(unsigned char* imgIn, unsigned char* imgOut, int width, int heigh
 	cudaCheckStatus(cudaFree(deviceOutMatrix));
 }
 
-//checking
+
+//<----------------------------------GPU WITH SHARED------------------------------------->
+
+__global__ void stampingEffectCudaShared(unsigned char* src, unsigned char* dst, int width, int height)
+{
+	int offsetX = blockIdx.x*blockDim.x + threadIdx.x;
+	int offsetY = blockIdx.y*blockDim.y + threadIdx.y;
+
+	__shared__ int smemIn[(BLOCK_X+2)*(BLOCK_Y+2)];
+	__shared__ int smemOut[(BLOCK_X+2)*(BLOCK_Y+2)];
+	int sharedBlockSizeX = BLOCK_X + 2;
+	int sharedBlockSizeY = BLOCK_Y + 2;
+
+	if (offsetX == 0 || offsetY == 0 || offsetX == width - 1 || offsetY == height - 1)
+	{
+		return;
+	}
+
+	//
+	smemIn[(threadIdx.y+1)*sharedBlockSizeX + (threadIdx.x+1)] = src[(offsetY + 0)*width + (offsetX + 0)];
+	
+	//useless
+	if (threadIdx.x == 0 && threadIdx.y == 0)
+	{
+		smemIn[0] = src[(offsetY - 1)*width + (offsetX - 1)];
+	}
+	if (threadIdx.x == 0 && threadIdx.y == blockDim.y-1)
+	{
+		smemIn[(sharedBlockSizeY-1)*sharedBlockSizeX] = src[(offsetY + 1)*width + (offsetX - 1)];
+	}
+	if (threadIdx.x == blockDim.x-1 && threadIdx.y == 0)
+	{
+		smemIn[sharedBlockSizeX - 1] = src[(offsetY - 1)*width + (offsetX + 1)];
+	}
+	if (threadIdx.x == blockDim.x - 1 && threadIdx.y == blockDim.y - 1)
+	{
+		smemIn[(sharedBlockSizeY - 1)*sharedBlockSizeX+(sharedBlockSizeX-1)] = src[(offsetY + 1)*width + (offsetX + 1)];
+	}
+	
+	//
+	if (threadIdx.y == 0)
+	{
+		smemIn[threadIdx.x + 2] = src[(offsetY - 1)*width + (offsetX + 0)];
+	}
+	if (threadIdx.x == 0)
+	{
+		smemIn[(threadIdx.y + 1)*sharedBlockSizeX] = src[(offsetY + 0)*width + (offsetX - 1)];
+	}
+	if (threadIdx.x == blockDim.x - 1)
+	{
+		smemIn[(threadIdx.y + 1)*sharedBlockSizeX+ (sharedBlockSizeX - 1)] = src[(offsetY + 0)*width + (offsetX + 1)];
+	}
+	if (threadIdx.y == blockDim.y - 1)
+	{
+		smemIn[(sharedBlockSizeY - 1)*sharedBlockSizeX + (threadIdx.x + 1)] = src[(offsetY + 1)*width + (offsetX + 0)];
+	}
+
+	__syncthreads();
+	/*unsigned char top = src[(offsetY - 1)*width + (offsetX + 0)];
+	unsigned char left = src[(offsetY + 0)*width + (offsetX - 1)];
+	unsigned char right = src[(offsetY + 0)*width + (offsetX + 1)];
+	unsigned char botom = src[(offsetY + 1)*width + (offsetX + 0)];
+
+	dst[offsetY*width + offsetX] = top + left - right - botom;*/
+
+	int offX = threadIdx.x + 1;
+	int offY = threadIdx.y + 1;
+
+	unsigned char top = smemIn[(offY - 1)*sharedBlockSizeX + (offX + 0)];
+	unsigned char left = smemIn[(offY + 0)*sharedBlockSizeX + (offX - 1)];
+	unsigned char right = smemIn[(offY + 0)*sharedBlockSizeX + (offX + 1)];
+	unsigned char botom = smemIn[(offY + 1)*sharedBlockSizeX + (offX + 0)];
+
+	smemOut[offY*sharedBlockSizeX + offX] = top + left - right - botom;
+
+	dst[(offsetY + 0)*width + (offsetX + 0)] = smemOut[(threadIdx.y + 1)*sharedBlockSizeX + (threadIdx.x + 1)];
+
+	__syncthreads();
+
+}
+
+
+void cuda_work_shared(unsigned char* imgIn, unsigned char* imgOut, int width, int height)
+{
+	unsigned char* deviceInMatrix;
+	unsigned char* deviceOutMatrix;
+
+	cudaEvent_t start, stop;
+	cudaCheckStatus(cudaEventCreate(&start));
+	cudaCheckStatus(cudaEventCreate(&stop));
+
+	int widthGpu = width, heightGpu = height;
+	if (widthGpu%BLOCK_X != 0)
+	{
+		widthGpu = (width / BLOCK_X + 1)*BLOCK_X;
+	}
+	if (heightGpu%BLOCK_Y != 0)
+	{
+		heightGpu = (height / BLOCK_Y + 1)*BLOCK_Y;
+	}
+
+	//int pitch= (width / THREAD_X + 1)*THREAD_X;
+
+	cudaCheckStatus(cudaMalloc(&deviceInMatrix, (widthGpu*heightGpu * sizeof(unsigned char))));
+	cudaCheckStatus(cudaMalloc(&deviceOutMatrix, (widthGpu*heightGpu * sizeof(unsigned char))));
+	for (int i = 0; i < height; ++i)
+	{
+		cudaCheckStatus(cudaMemcpy(&deviceInMatrix[i*widthGpu], &imgIn[i*width], width * sizeof(unsigned char), cudaMemcpyHostToDevice));
+	}
+
+	dim3 dimGrid(widthGpu / BLOCK_X, heightGpu / BLOCK_Y);
+	dim3 dimBlock(BLOCK_X, BLOCK_Y);
+	printf("gridX = %d gridY = %d\n", dimGrid.x, dimGrid.y);
+	printf("blockX = %d blockY = %d\n", dimBlock.x, dimBlock.y);
+
+	cudaCheckStatus(cudaEventRecord(start, 0));
+
+	stampingEffectCudaShared << <dimGrid, dimBlock >> > (deviceInMatrix, deviceOutMatrix, widthGpu, heightGpu);
+
+	cudaCheckStatus(cudaPeekAtLastError());
+	cudaCheckStatus(cudaDeviceSynchronize());
+	cudaCheckStatus(cudaEventRecord(stop, 0));
+	cudaCheckStatus(cudaEventSynchronize(stop));
+
+	float elapsedTime;
+	cudaCheckStatus(cudaEventElapsedTime(&elapsedTime, start, stop));
+
+	printf("The time for cuda with shared memory spend: %.3f ms\n\n", elapsedTime);
+
+	cudaCheckStatus(cudaEventDestroy(start));
+	cudaCheckStatus(cudaEventDestroy(stop));
+
+	unsigned char* temp = new unsigned char[widthGpu*heightGpu];
+	cudaCheckStatus(cudaMemcpy2D(imgOut, width, deviceOutMatrix, widthGpu, width, height, cudaMemcpyDeviceToHost));
+
+	cudaCheckStatus(cudaFree(deviceInMatrix));
+	cudaCheckStatus(cudaFree(deviceOutMatrix));
+}
+
+//<----------------------------------CHECKING------------------------------------->
 
 bool compareTwoPictures(unsigned char* first, unsigned char* second, int width, int height)
 {
@@ -189,6 +328,7 @@ bool compareTwoPictures(unsigned char* first, unsigned char* second, int width, 
 	{
 		if (first[i] != second[i])
 		{
+			printf("The mistake is at index: %d", i);
 			return false;
 		}
 	}
@@ -200,6 +340,7 @@ int main()
 	char* imagePathInput = "mountain.pgm";
 	char* imagePathResCpu = "mountain_outCPU.pgm";
 	char* imagePathResGpu = "mountain_outGPU.pgm";
+	char* imagePathResGpuShared = "mountain_outGPUShared.pgm";
 
 	unsigned char* inputImg = nullptr;
 	unsigned int widthImage = 0, heightImage = 0, channels = 0;
@@ -227,12 +368,20 @@ int main()
 	cuda_work(imgWithFrame, temp_GPU, width, height);
 	deleteFrameFromoImage(temp_GPU, imgGPUOut, width, height);
 
-	__savePPM(imagePathResCpu, imgCPUOut, widthImage, heightImage, channels);
+	//CUDA WITH SHARED
+	unsigned char* temp_GPU_shared = new unsigned char[width*height];
+	cuda_work_shared(imgWithFrame, temp_GPU_shared, width, height);
+	deleteFrameFromoImage(temp_GPU_shared, imgGPUWithSharedOut, width, height);
+
+	//__savePPM(imagePathResCpu, imgCPUOut, widthImage, heightImage, channels);
 	printf("SAVED CPU Picture\n");
-	__savePPM(imagePathResGpu, imgGPUOut, widthImage, heightImage, channels);
+	//__savePPM(imagePathResGpu, imgGPUOut, widthImage, heightImage, channels);
 	printf("SAVED GPU Picture\n");
+	//__savePPM(imagePathResGpuShared, imgGPUWithSharedOut, widthImage, heightImage, channels);
+	printf("SAVED GPU SHARED Picture\n");
 
 	printf("\nRESULT OF COMPARE CUDA AND CPU: %s\n", (compareTwoPictures(imgCPUOut, imgGPUOut, widthImage, heightImage) ? "+" : "-"));
+	printf("\nRESULT OF COMPARE CUDA SHARED AND CPU: %s\n", (compareTwoPictures(imgCPUOut, imgGPUWithSharedOut, widthImage, heightImage) ? "+" : "-"));
 
 	free(inputImg);
 	free(imgCPUOut);
@@ -240,5 +389,6 @@ int main()
 	free(imgGPUWithSharedOut);
 	free(temp_CPU);
 	free(temp_GPU);
+	free(temp_GPU_shared);
 }
 
